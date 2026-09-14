@@ -11,6 +11,10 @@ env:
 
 jobs:
   build-and-test:
+    env:
+      SPRING_DATASOURCE_URL: ${{ secrets.SPRING_DATASOURCE_URL }}
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: ${{ secrets.SPRING_DATASOURCE_PASSWORD }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
