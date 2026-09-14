@@ -6,12 +6,13 @@ on:
   pull_request:
     branches: [main]
 
-env:
-  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/outflow-backend
-
 jobs:
-  build-and-test:
+  build-test-and-push:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -23,22 +24,14 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
+      - name: Make wrapper executable
+        run: chmod +x mvnw
+
       - name: Build and test
         run: ./mvnw clean verify
 
-  build-and-push-image:
-    needs: build-and-test
-    if: github.event_name == 'push'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
       - name: Log in to GHCR
+        if: github.event_name == 'push'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -46,34 +39,37 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Compute image tags
+        if: github.event_name == 'push'
         id: vars
         run: |
           SHA_SHORT=$(git rev-parse --short HEAD)
-          # sanitize branch name for use in a Docker tag (replace / with -)
-          BRANCH_TAG=$(echo "${GITHUB_REF_NAME}" | tr '/' '-')
+          # Convert branch name and image repository name to lowercase for Docker tag compliance
+          BRANCH_TAG=$(echo "${GITHUB_REF_NAME}" | tr '/' '-' | tr '[:upper:]' '[:lower:]')
+          IMAGE_NAME=$(echo "ghcr.io/${{ github.repository_owner }}/outflow-backend" | tr '[:upper:]' '[:lower:]')
           echo "sha_short=$SHA_SHORT" >> $GITHUB_OUTPUT
           echo "branch_tag=$BRANCH_TAG" >> $GITHUB_OUTPUT
+          echo "image_name=$IMAGE_NAME" >> $GITHUB_OUTPUT
 
       - name: Build and push image (feature branch)
-        if: github.ref != 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref != 'refs/heads/main'
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
           tags: |
-            ${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.branch_tag }}
-            ${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.branch_tag }}-${{ steps.vars.outputs.sha_short }}
+            ${{ steps.vars.outputs.image_name }}:${{ steps.vars.outputs.branch_tag }}
+            ${{ steps.vars.outputs.image_name }}:${{ steps.vars.outputs.branch_tag }}-${{ steps.vars.outputs.sha_short }}
 
       - name: Build and push image (main)
-        if: github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
           tags: |
-            ${{ env.IMAGE_NAME }}:latest
-            ${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.sha_short }}
+            ${{ steps.vars.outputs.image_name }}:latest
+            ${{ steps.vars.outputs.image_name }}:${{ steps.vars.outputs.sha_short }}
 
       - name: Trigger Render redeploy
-        if: github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK }}
