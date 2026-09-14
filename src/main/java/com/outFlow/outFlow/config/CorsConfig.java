@@ -17,7 +17,7 @@ public class CorsConfig {
         CorsConfiguration configuration = new CorsConfiguration();
 
         configuration.setAllowedOrigins(
-                List.of("http://localhost:4200")
+                List.of("https://outflow-ui-git-feature-authentication-pcollection.vercel.app/")
         );
 
         configuration.setAllowedMethods(

@@ -55,8 +55,8 @@ public class OAuth2LoginSuccessHandler
         ResponseCookie cookie =
                 ResponseCookie.from("access_token", jwt)
                         .httpOnly(true)
-                        .secure(false) // true in production HTTPS
-                        .sameSite("Lax")
+                        .secure(true) // true in production HTTPS
+                        .sameSite("None")
                         .path("/")
                         .maxAge(24 * 60 * 60)
                         .build();
